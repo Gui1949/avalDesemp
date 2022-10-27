@@ -40,6 +40,16 @@ app.post("/login", (req, res) => {
 app.post("/formulario", (req, res) => {
   console.log(req.body);
 
+  let codfunc = req.body.codfunc;
+  let codpen = req.body.codpen;
+  let tipo;
+
+  if (codfunc == codpen) {
+    tipo = "WHERE TIPO = 0";
+  } else {
+    tipo = "WHERE TIPO IN (0,1)";
+  }
+
   sql
     .connect(connStr)
     .then((conn) => {
@@ -47,8 +57,8 @@ app.post("/formulario", (req, res) => {
 
       let request = new sql.Request();
       request.query(
-        `SELECT PIL.CODPIL, NOMEPIL, CODCARA, NOMECARA FROM CARACTERISTICA CARA
-        INNER JOIN PILAR PIL ON PIL.CODPIL = CARA.CODPIL WHERE TIPO = 0`,
+        `SELECT PIL.CODPIL, NOMEPIL, CODCARA, NOMECARA, PIL.TIPO FROM CARACTERISTICA CARA
+        INNER JOIN PILAR PIL ON PIL.CODPIL = CARA.CODPIL ${tipo} ORDER BY CODCARA`,
         function (err, recordset) {
           res.json(recordset.recordsets[0]);
         }
@@ -60,6 +70,8 @@ app.post("/formulario", (req, res) => {
 app.post("/resposta", (req, res) => {
   console.log(req.body);
 
+  let codpen = req.body.codpen;
+
   sql
     .connect(connStr)
     .then((conn) => {
@@ -67,11 +79,11 @@ app.post("/resposta", (req, res) => {
 
       let request = new sql.Request();
       request.query(
-        `SELECT NOMEPIL, NOMECARA, RESPOSTA  FROM AVAITEM ITE
+        `SELECT NOMEPIL, PIL.TIPO, NOMECARA, RESPOSTA  FROM AVAITEM ITE
         INNER JOIN CARACTERISTICA CARA ON CARA.CODCARA  = ITE.CODCARA
         INNER JOIN PILAR PIL ON PIL.CODPIL = CARA.CODPIL
         INNER JOIN AVAPEN PEN ON PEN.CODAVA = ITE.CODAVA
-        WHERE CODPEN = 18`,
+        WHERE CODPEN = ${codpen} ORDER BY PIL.CODPIL`,
         function (err, recordset) {
           res.json(recordset.recordsets[0]);
         }
@@ -152,7 +164,7 @@ app.post("/send_formulario", (req, res) => {
                         let request = new sql.Request();
 
                         request.query(
-                          `INSERT INTO AVAITEM (CODAVA, CODCARA, RESPOSTA) VALUES (${codava}, ${key}, ${value})
+                          `INSERT INTO AVAITEM (CODAVA, CODCARA, RESPOSTA) VALUES (${codava}, ${key}, '${value}')
                           UPDATE AVAPEN SET CODAVA = ${codava}, STATUS = 1 WHERE CODPEN = ${codpen}
                           `,
                           function (err, recordset) {
