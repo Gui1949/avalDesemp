@@ -27,7 +27,7 @@ app.post("/login", (req, res) => {
 
       let request = new sql.Request();
       request.query(
-        `SELECT CODFUNC FROM FUNCIONARIO WHERE EMAILFUNC = '${email}' AND SENHA = '${senha}'`,
+        `SELECT CODFUNC, TIPOID FROM FUNCIONARIO WHERE EMAILFUNC = '${email}' AND SENHA = '${senha}'`,
         function (err, recordset) {
           console.log(recordset);
           res.json(recordset.recordsets[0][0]);
@@ -41,10 +41,10 @@ app.post("/formulario", (req, res) => {
   console.log(req.body);
 
   let codfunc = req.body.codfunc;
-  let codpen = req.body.codpen;
+  let codref = req.body.codref;
   let tipo;
 
-  if (codfunc == codpen) {
+  if (codfunc == codref) {
     tipo = "WHERE TIPO = 0";
   } else {
     tipo = "WHERE TIPO IN (0,1)";
@@ -95,6 +95,26 @@ app.post("/resposta", (req, res) => {
 app.post("/pendentes", (req, res) => {
   console.log(req.body);
   let codfunc = req.body.codfunc;
+  let tipoid = req.body.tipoid;
+
+  let tipo = () => {
+    return tipoid == 1 ? "CODFUNC" : "CODREF";
+  };
+
+  let union = () => {
+    return tipoid == 1
+      ? ""
+      : `UNION
+
+    SELECT CODPEN, FUNC.NOMEFUNC, FUNC1.NOMEFUNC AS GESTOR, CASE WHEN STATUS = 0 THEN 'PENDENTE' ELSE 'REALIZADO' END AS STATUS, FORMAT(DATAINS, 'd', 'pt-br') AS DATAINS, 
+    FORMAT(CAB.DTINC, 'd', 'pt-br') AS DTINC, FUNC.TIPOID, PEN.CODREF, FUNC.CODFUNC, FUNC.CODGESTOR
+    FROM AVAPEN PEN
+    LEFT JOIN FUNCIONARIO FUNC ON FUNC.CODFUNC = PEN.CODFUNC
+    LEFT JOIN FUNCIONARIO FUNC1 ON FUNC1.CODFUNC = PEN.CODREF
+    LEFT JOIN AVACAB CAB ON CAB.CODAVA = PEN.CODAVA
+    WHERE FUNC.CODGESTOR = ${codfunc}
+    `;
+  };
 
   sql
     .connect(connStr)
@@ -103,16 +123,21 @@ app.post("/pendentes", (req, res) => {
 
       let request = new sql.Request();
       request.query(
-        `SELECT CODPEN, FUNC.NOMEFUNC, CASE WHEN STATUS = 0 THEN 'PENDENTE' ELSE 'REALIZADO' END AS STATUS, FORMAT(DATAINS, 'd', 'pt-br') AS DATAINS, 
-        FORMAT(CAB.DTINC, 'd', 'pt-br') AS DTINC
+        `SELECT CODPEN, FUNC.NOMEFUNC, FUNC1.NOMEFUNC AS GESTOR, CASE WHEN STATUS = 0 THEN 'PENDENTE' ELSE 'REALIZADO' END AS STATUS, FORMAT(DATAINS, 'd', 'pt-br') AS DATAINS, 
+        FORMAT(CAB.DTINC, 'd', 'pt-br') AS DTINC, FUNC.TIPOID, PEN.CODREF, FUNC.CODFUNC, NULL AS CODGESTOR
         FROM AVAPEN PEN
-        INNER JOIN FUNCIONARIO FUNC ON FUNC.CODFUNC = PEN.CODFUNC
+        LEFT JOIN FUNCIONARIO FUNC ON FUNC.CODFUNC = PEN.CODFUNC
+        LEFT JOIN FUNCIONARIO FUNC1 ON FUNC1.CODFUNC = PEN.CODREF
         LEFT JOIN AVACAB CAB ON CAB.CODAVA = PEN.CODAVA
-        WHERE PEN.CODREF = ${codfunc}`,
+        WHERE PEN.${tipo()} = ${codfunc}
+        ${union()}
+        `,
         function (err, recordset) {
           try {
             res.json(recordset.recordsets[0]);
-          } catch {}
+          } catch (err) {
+            console.log(err);
+          }
         }
       );
     })
