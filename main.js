@@ -27,7 +27,7 @@ app.post("/login", (req, res) => {
 
       let request = new sql.Request();
       request.query(
-        `SELECT CODFUNC, TIPOID FROM FUNCIONARIO WHERE EMAILFUNC = '${email}' AND SENHA = '${senha}'`,
+        `SELECT CODFUNC, TIPOID, CODGESTOR FROM FUNCIONARIO WHERE EMAILFUNC = '${email}' AND SENHA = '${senha}'`,
         function (err, recordset) {
           console.log(recordset);
           res.json(recordset.recordsets[0][0]);
@@ -92,6 +92,51 @@ app.post("/resposta", (req, res) => {
     .catch((err) => console.log("erro! " + err));
 });
 
+app.post("/resposta_media", (req, res) => {
+  console.log(req.body);
+
+  let codpen = req.body.codpen;
+
+  sql
+    .connect(connStr)
+    .then((conn) => {
+      console.log("conectou!");
+
+      let request = new sql.Request();
+      request.query(
+        `SELECT 1 AS ID, NOMEPIL, SUM(CAST(RESPOSTA AS int)) AS SOMA
+        FROM AVAITEM ITE
+                LEFT JOIN CARACTERISTICA CARA ON CARA.CODCARA  = ITE.CODCARA
+                LEFT JOIN PILAR PIL ON PIL.CODPIL = CARA.CODPIL
+                LEFT JOIN AVAPEN PEN ON PEN.CODAVA = ITE.CODAVA
+                WHERE CODPEN = ${codpen} AND TIPO = 0
+            GROUP BY NOMEPIL
+        
+        UNION
+        
+        SELECT 99 AS ID, 'Total' AS NOMEPIL, COUNT(RESPOSTA) AS SOMA
+        FROM AVAITEM ITE
+                LEFT JOIN CARACTERISTICA CARA ON CARA.CODCARA  = ITE.CODCARA
+                LEFT JOIN PILAR PIL ON PIL.CODPIL = CARA.CODPIL
+                LEFT JOIN AVAPEN PEN ON PEN.CODAVA = ITE.CODAVA
+                WHERE CODPEN = ${codpen} AND TIPO = 0
+        
+        UNION
+        
+        SELECT 100 AS ID, 'Media' as NOMEPIL, (SUM(CAST(RESPOSTA AS decimal))/COUNT(RESPOSTA)) AS SOMA
+        FROM AVAITEM ITE
+                LEFT JOIN CARACTERISTICA CARA ON CARA.CODCARA  = ITE.CODCARA
+                LEFT JOIN PILAR PIL ON PIL.CODPIL = CARA.CODPIL
+                LEFT JOIN AVAPEN PEN ON PEN.CODAVA = ITE.CODAVA
+                WHERE CODPEN = ${codpen} AND TIPO = 0`,
+        function (err, recordset) {
+          res.json(recordset.recordsets[0]);
+        }
+      );
+    })
+    .catch((err) => console.log("erro! " + err));
+});
+
 app.post("/pendentes", (req, res) => {
   console.log(req.body);
   let codfunc = req.body.codfunc;
@@ -103,7 +148,7 @@ app.post("/pendentes", (req, res) => {
 
   let union = () => {
     return tipoid == 1
-      ? ""
+      ? ``
       : `UNION
 
     SELECT CODPEN, FUNC.NOMEFUNC, FUNC1.NOMEFUNC AS GESTOR, CASE WHEN STATUS = 0 THEN 'PENDENTE' ELSE 'REALIZADO' END AS STATUS, FORMAT(DATAINS, 'd', 'pt-br') AS DATAINS, 
@@ -113,6 +158,16 @@ app.post("/pendentes", (req, res) => {
     LEFT JOIN FUNCIONARIO FUNC1 ON FUNC1.CODFUNC = PEN.CODREF
     LEFT JOIN AVACAB CAB ON CAB.CODAVA = PEN.CODAVA
     WHERE FUNC.CODGESTOR = ${codfunc}
+
+    UNION
+
+    SELECT CODPEN, FUNC.NOMEFUNC, FUNC1.NOMEFUNC AS GESTOR, CASE WHEN STATUS = 0 THEN 'PENDENTE' ELSE 'REALIZADO' END AS STATUS, FORMAT(DATAINS, 'd', 'pt-br') AS DATAINS, 
+    FORMAT(CAB.DTINC, 'd', 'pt-br') AS DTINC, FUNC.TIPOID, PEN.CODREF, FUNC.CODFUNC, FUNC.CODGESTOR
+    FROM AVAPEN PEN
+    LEFT JOIN FUNCIONARIO FUNC ON FUNC.CODFUNC = PEN.CODFUNC
+    LEFT JOIN FUNCIONARIO FUNC1 ON FUNC1.CODFUNC = PEN.CODREF
+    LEFT JOIN AVACAB CAB ON CAB.CODAVA = PEN.CODAVA
+    WHERE FUNC.CODFUNC = ${codfunc}
     `;
   };
 
