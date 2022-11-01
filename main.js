@@ -123,7 +123,7 @@ app.post("/resposta_media", (req, res) => {
         
         UNION
         
-        SELECT 100 AS ID, 'Media' as NOMEPIL, (SUM(CAST(RESPOSTA AS decimal))/COUNT(RESPOSTA)) AS SOMA
+        SELECT 100 AS ID, 'Pontuação Média' as NOMEPIL, (SUM(CAST(RESPOSTA AS decimal))/COUNT(RESPOSTA)) AS SOMA
         FROM AVAITEM ITE
                 LEFT JOIN CARACTERISTICA CARA ON CARA.CODCARA  = ITE.CODCARA
                 LEFT JOIN PILAR PIL ON PIL.CODPIL = CARA.CODPIL
@@ -131,6 +131,62 @@ app.post("/resposta_media", (req, res) => {
                 WHERE CODPEN = ${codpen} AND TIPO = 0`,
         function (err, recordset) {
           res.json(recordset.recordsets[0]);
+        }
+      );
+    })
+    .catch((err) => console.log("erro! " + err));
+});
+
+app.post("/func_aval", (req, res) => {
+  console.log(req.body);
+
+  let codpen = req.body.codpen;
+
+  sql
+    .connect(connStr)
+    .then((conn) => {
+      console.log("conectou!");
+
+      let request = new sql.Request();
+      request.query(
+        `SELECT CODPEN, FUNC.NOMEFUNC, STATUS, FUNC1.NOMEFUNC AS AVALIADOR, CODAVA FROM AVAPEN PEN
+        INNER JOIN FUNCIONARIO FUNC ON FUNC.CODFUNC = PEN.CODFUNC
+        INNER JOIN FUNCIONARIO FUNC1 ON FUNC1.CODFUNC = PEN.CODREF
+        WHERE 
+        DATEPART(HOUR,DATAINS) = (SELECT MAX(DATEPART(HOUR,DATAINS)) FROM AVAPEN) AND
+        DATEPART(YEAR,DATAINS) = (SELECT MAX(DATEPART(YEAR,DATAINS)) FROM AVAPEN) AND
+        DATEPART(MONTH,DATAINS) = (SELECT MAX(DATEPART(MONTH,DATAINS)) FROM AVAPEN) AND
+        DATEPART(DAY,DATAINS) = (SELECT MAX(DATEPART(DAY,DATAINS)) FROM AVAPEN) AND
+        DATEPART(MINUTE,DATAINS) = (SELECT MAX(DATEPART(MINUTE,DATAINS)) FROM AVAPEN)
+        AND PEN.CODFUNC <> PEN.CODREF
+        `,
+        function (err, recordset) {
+          res.json(recordset.recordsets[0]);
+        }
+      );
+    })
+    .catch((err) => console.log("erro! " + err));
+})
+
+app.post("/iniciar_aval", (req, res) => {
+  console.log(req.body);
+  sql
+    .connect(connStr)
+    .then((conn) => {
+      console.log("conectou!");
+
+      let request = new sql.Request();
+      request.query(
+        `SELECT CODFUNC, CODGESTOR FROM FUNCIONARIO`,
+        function (err, recordset) {
+          let resposta = recordset.recordsets[0];
+          resposta.forEach((element) => {
+            request.query(
+              `INSERT INTO AVAPEN (CODFUNC, STATUS, CODREF) VALUES (${element.CODFUNC},0,${element.CODFUNC})
+              INSERT INTO AVAPEN (CODFUNC, STATUS, CODREF) VALUES (${element.CODFUNC},0,${element.CODGESTOR})`
+            );
+          });
+          res.send(200);
         }
       );
     })
