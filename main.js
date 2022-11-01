@@ -123,7 +123,7 @@ app.post("/resposta_media", (req, res) => {
         
         UNION
         
-        SELECT 100 AS ID, 'Pontuação Média' as NOMEPIL, (SUM(CAST(RESPOSTA AS decimal))/COUNT(RESPOSTA)) AS SOMA
+        SELECT 100 AS ID, 'Pontuação Média' as NOMEPIL, CAST(SUM(CAST(RESPOSTA AS DECIMAL))/COUNT(RESPOSTA) AS DECIMAL(5,2)) AS SOMA
         FROM AVAITEM ITE
                 LEFT JOIN CARACTERISTICA CARA ON CARA.CODCARA  = ITE.CODCARA
                 LEFT JOIN PILAR PIL ON PIL.CODPIL = CARA.CODPIL
