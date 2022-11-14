@@ -361,6 +361,33 @@ app.post("/iniciar_aval", (req, res) => {
     .catch((err) => console.log("erro! " + err));
 });
 
+app.post("/troca_senha", (req, res) => {
+  console.log(req.body);
+
+  let dados = req.body
+
+  sql
+    .connect(connStr)
+    .then((conn) => {
+      console.log("conectou!");
+
+      let request = new sql.Request();
+      request.query(
+        `SELECT SENHA FROM FUNCIONARIO WHERE SENHA = '${md5(dados.password)}' AND CODFUNC = ${dados.codfunc}`,
+        function (err, recordset) {
+          let resposta = recordset.recordsets[0];
+          resposta.forEach((element) => {
+            request.query(
+              `UPDATE FUNCIONARIO SET SENHA = ${dados.new_password} WHERE CODFUNC = ${dados.codfunc}`
+            );
+          });
+          res.send(200);
+        }
+      );
+    })
+    .catch((err) => console.log("erro! " + err));
+});
+
 app.post("/encerrar_aval", (req, res) => {
   console.log(req.body);
   sql
