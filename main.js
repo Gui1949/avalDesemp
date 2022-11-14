@@ -66,11 +66,15 @@ app.post("/login", (req, res) => {
       request.query(
         `SELECT CODFUNC, TIPOID, CODGESTOR FROM FUNCIONARIO WHERE EMAILFUNC = '${email}' AND SENHA = '${senha}'`,
         function (err, recordset) {
-          console.log(recordset.recordsets[0][0]);
-          let resposta = recordset.recordsets[0][0];
-          resposta.token = sessao();
-          criar_sessao(resposta.CODFUNC, resposta.token);
-          res.json(resposta);
+          try {
+            console.log(recordset.recordsets[0][0]);
+            let resposta = recordset.recordsets[0][0];
+            resposta.token = sessao();
+            criar_sessao(resposta.CODFUNC, resposta.token);
+            res.json(resposta);
+          } catch {
+            res.send(403);
+          }
         }
       );
     })
@@ -249,74 +253,58 @@ app.post("/novo_usu", (req, res) => {
 
       let request = new sql.Request();
 
-      console.log(
-        `${
-          dados.Nome
-            ? "UPDATE FUNCIONARIO SET NOMEFUNC = '" +
-              dados.Nome +
-              `' WHERE CODFUNC = ${dados.codfunc} `
-            : ""
-        }` +
+      if (dados.codfunc) {
+        request.query(
           `${
-            dados.Email
-              ? "UPDATE FUNCIONARIO SET EMAILFUNC = '" +
-                dados.Email +
+            dados.Nome
+              ? "UPDATE FUNCIONARIO SET NOMEFUNC = '" +
+                dados.Nome +
                 `' WHERE CODFUNC = ${dados.codfunc} `
               : ""
           }` +
-          `${
-            dados.Departamento
-              ? `UPDATE FUNCIONARIO SET CODDEP = (SELECT CODDEP FROM DEPARTAMENTO WHERE NOMEDEP ='${dados.Departamento}') WHERE CODFUNC = ${dados.codfunc} `
-              : ""
-          }` +
-          `${
-            dados.Cargo
-              ? `UPDATE FUNCIONARIO SET CODCAR = (SELECT CODCAR FROM CARGO WHERE NOMECAR = '${dados.Cargo}') WHERE CODFUNC = ${dados.codfunc} `
-              : ""
-          }`
-      );
+            `${
+              dados.Email
+                ? "UPDATE FUNCIONARIO SET EMAILFUNC = '" +
+                  dados.Email +
+                  `' WHERE CODFUNC = ${dados.codfunc} `
+                : ""
+            }` +
+            `${
+              dados.Departamento
+                ? `UPDATE FUNCIONARIO SET CODDEP = (SELECT CODDEP FROM DEPARTAMENTO WHERE NOMEDEP ='${dados.Departamento}') WHERE CODFUNC = ${dados.codfunc} `
+                : ""
+            }` +
+            `${
+              dados.Cargo
+                ? `UPDATE FUNCIONARIO SET CODCAR = (SELECT CODCAR FROM CARGO WHERE NOMECAR = '${dados.Cargo}') WHERE CODFUNC = ${dados.codfunc} `
+                : ""
+            }` +
+            `${
+              dados.FUNCIONARIO
+                ? `UPDATE FUNCIONARIO SET CODGESTOR = (SELECT CODFUNC FROM FUNCIONARIO WHERE NOMEFUNC = '${dados.FUNCIONARIO}') WHERE CODFUNC = ${dados.codfunc} `
+                : ""
+            }` +
+            `${
+              dados.TIPOFUNC
+                ? `UPDATE FUNCIONARIO SET TIPOID = (SELECT TIPOID FROM TIPOFUNC WHERE DESCRICAO = '${dados.TIPOFUNC}') WHERE CODFUNC = ${dados.codfunc} `
+                : ""
+            }`,
 
-      request.query(
-        `${
-          dados.Nome
-            ? "UPDATE FUNCIONARIO SET NOMEFUNC = '" +
-              dados.Nome +
-              `' WHERE CODFUNC = ${dados.codfunc} `
-            : ""
-        }` +
-          `${
-            dados.Email
-              ? "UPDATE FUNCIONARIO SET EMAILFUNC = '" +
-                dados.Email +
-                `' WHERE CODFUNC = ${dados.codfunc} `
-              : ""
-          }` +
-          `${
-            dados.Departamento
-              ? `UPDATE FUNCIONARIO SET CODDEP = (SELECT CODDEP FROM DEPARTAMENTO WHERE NOMEDEP ='${dados.Departamento}') WHERE CODFUNC = ${dados.codfunc} `
-              : ""
-          }` +
-          `${
-            dados.Cargo
-              ? `UPDATE FUNCIONARIO SET CODCAR = (SELECT CODCAR FROM CARGO WHERE NOMECAR = '${dados.Cargo}') WHERE CODFUNC = ${dados.codfunc} `
-              : ""
-          }` +
-          `${
-            dados.FUNCIONARIO
-              ? `UPDATE FUNCIONARIO SET CODGESTOR = (SELECT CODFUNC FROM FUNCIONARIO WHERE NOMEFUNC = '${dados.FUNCIONARIO}') WHERE CODFUNC = ${dados.codfunc} `
-              : ""
-          }` +
-          `${
-            dados.TIPOFUNC
-              ? `UPDATE FUNCIONARIO SET TIPOID = (SELECT TIPOID FROM TIPOFUNC WHERE DESCRICAO = '${dados.TIPOFUNC}') WHERE CODFUNC = ${dados.codfunc} `
-              : ""
-          }`,
-
-        function (err, recordset) {
-          // console.log(request.query);
-          res.json(recordset.recordsets[0]);
-        }
-      );
+          function (err, recordset) {
+            // console.log(request.query);
+            res.json(recordset.recordsets[0]);
+          }
+        );
+      } else {
+        request.query(
+          `INSERT INTO FUNCIONARIO VALUES ('${dados.Nome}','${dados.Email}',(SELECT CODDEP FROM DEPARTAMENTO WHERE NOMEDEP ='${dados.Departamento}'),(SELECT CODCAR FROM CARGO WHERE NOMECAR = '${dados.Cargo}'),(SELECT CODFUNC FROM FUNCIONARIO WHERE NOMEFUNC = '${dados.FUNCIONARIO}'),'123123','S',(SELECT TIPOID FROM TIPOFUNC WHERE DESCRICAO = '${dados.TIPOFUNC}'))`,
+          function (err, recordset) {
+            console.log(recordset);
+            console.log(err)
+            res.json(recordset);
+          }
+        );
+      }
     })
     .catch((err) => console.log("erro! " + err));
 });
@@ -373,21 +361,39 @@ app.post("/iniciar_aval", (req, res) => {
     .catch((err) => console.log("erro! " + err));
 });
 
+app.post("/encerrar_aval", (req, res) => {
+  console.log(req.body);
+  sql
+    .connect(connStr)
+    .then((conn) => {
+      console.log("conectou!");
+
+      let request = new sql.Request();
+      request.query(
+        `UPDATE AVAPEN SET STATUS = 3 WHERE STATUS = 0`,
+        function (err, recordset) {
+          res.send(200);
+        }
+      );
+    })
+    .catch((err) => console.log("erro! " + err));
+});
+
 app.post("/pendentes", (req, res) => {
   console.log(req.body);
   let codfunc = req.body.codfunc;
   let tipoid = req.body.tipoid;
 
   let tipo = () => {
-    return tipoid == 1 ? "CODFUNC" : "CODREF";
+    return tipoid == 2 ? "CODFUNC" : "CODREF";
   };
 
   let union = () => {
-    return tipoid == 1
+    return tipoid == 2
       ? ``
       : `UNION
 
-    SELECT CODPEN, FUNC.NOMEFUNC, FUNC1.NOMEFUNC AS GESTOR, CASE WHEN STATUS = 0 THEN 'PENDENTE' ELSE 'REALIZADO' END AS STATUS, FORMAT(DATAINS, 'd', 'pt-br') AS DATAINS, 
+    SELECT CODPEN, FUNC.NOMEFUNC, FUNC1.NOMEFUNC AS GESTOR, CASE WHEN STATUS = 0 THEN 'PENDENTE' WHEN STATUS = 3 THEN 'PERIODO ENCERRADO' ELSE 'REALIZADO' END AS STATUS, FORMAT(DATAINS, 'd', 'pt-br') AS DATAINS, 
     FORMAT(CAB.DTINC, 'd', 'pt-br') AS DTINC, FUNC.TIPOID, PEN.CODREF, FUNC.CODFUNC, FUNC.CODGESTOR
     FROM AVAPEN PEN
     LEFT JOIN FUNCIONARIO FUNC ON FUNC.CODFUNC = PEN.CODFUNC
@@ -397,7 +403,7 @@ app.post("/pendentes", (req, res) => {
 
     UNION
 
-    SELECT CODPEN, FUNC.NOMEFUNC, FUNC1.NOMEFUNC AS GESTOR, CASE WHEN STATUS = 0 THEN 'PENDENTE' ELSE 'REALIZADO' END AS STATUS, FORMAT(DATAINS, 'd', 'pt-br') AS DATAINS, 
+    SELECT CODPEN, FUNC.NOMEFUNC, FUNC1.NOMEFUNC AS GESTOR, CASE WHEN STATUS = 0 THEN 'PENDENTE' WHEN STATUS = 3 THEN 'PERIODO ENCERRADO' ELSE 'REALIZADO' END AS STATUS, FORMAT(DATAINS, 'd', 'pt-br') AS DATAINS, 
     FORMAT(CAB.DTINC, 'd', 'pt-br') AS DTINC, FUNC.TIPOID, PEN.CODREF, FUNC.CODFUNC, FUNC.CODGESTOR
     FROM AVAPEN PEN
     LEFT JOIN FUNCIONARIO FUNC ON FUNC.CODFUNC = PEN.CODFUNC
@@ -414,7 +420,7 @@ app.post("/pendentes", (req, res) => {
 
       let request = new sql.Request();
       request.query(
-        `SELECT CODPEN, FUNC.NOMEFUNC, FUNC1.NOMEFUNC AS GESTOR, CASE WHEN STATUS = 0 THEN 'PENDENTE' ELSE 'REALIZADO' END AS STATUS, FORMAT(DATAINS, 'd', 'pt-br') AS DATAINS, 
+        `SELECT CODPEN, FUNC.NOMEFUNC, FUNC1.NOMEFUNC AS GESTOR, CASE WHEN STATUS = 0 THEN 'PENDENTE' WHEN STATUS = 3 THEN 'PERIODO ENCERRADO' ELSE 'REALIZADO' END AS STATUS, FORMAT(DATAINS, 'd', 'pt-br') AS DATAINS, 
         FORMAT(CAB.DTINC, 'd', 'pt-br') AS DTINC, FUNC.TIPOID, PEN.CODREF, FUNC.CODFUNC, NULL AS CODGESTOR
         FROM AVAPEN PEN
         LEFT JOIN FUNCIONARIO FUNC ON FUNC.CODFUNC = PEN.CODFUNC
@@ -505,7 +511,7 @@ app.post("/campos", (req, res) => {
   console.log(req.body);
 
   let campo = req.body.campo;
-  let where = "WHERE TIPOID = 1";
+  let where = "WHERE TIPOID = 2";
 
   let campos = "";
 
