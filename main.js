@@ -300,7 +300,7 @@ app.post("/novo_usu", (req, res) => {
           `INSERT INTO FUNCIONARIO VALUES ('${dados.Nome}','${dados.Email}',(SELECT CODDEP FROM DEPARTAMENTO WHERE NOMEDEP ='${dados.Departamento}'),(SELECT CODCAR FROM CARGO WHERE NOMECAR = '${dados.Cargo}'),(SELECT CODFUNC FROM FUNCIONARIO WHERE NOMEFUNC = '${dados.FUNCIONARIO}'),'123123','S',(SELECT TIPOID FROM TIPOFUNC WHERE DESCRICAO = '${dados.TIPOFUNC}'))`,
           function (err, recordset) {
             console.log(recordset);
-            console.log(err)
+            console.log(err);
             res.json(recordset);
           }
         );
@@ -364,7 +364,7 @@ app.post("/iniciar_aval", (req, res) => {
 app.post("/troca_senha", (req, res) => {
   console.log(req.body);
 
-  let dados = req.body
+  let dados = req.body;
 
   sql
     .connect(connStr)
@@ -373,15 +373,18 @@ app.post("/troca_senha", (req, res) => {
 
       let request = new sql.Request();
       request.query(
-        `SELECT SENHA FROM FUNCIONARIO WHERE SENHA = '${md5(dados.password)}' AND CODFUNC = ${dados.codfunc}`,
+        `SELECT SENHA FROM FUNCIONARIO WHERE SENHA = '${md5(
+          dados.password
+        )}' AND CODFUNC = ${dados.codfunc}`,
         function (err, recordset) {
-          let resposta = recordset.recordsets[0];
-          resposta.forEach((element) => {
-            request.query(
-              `UPDATE FUNCIONARIO SET SENHA = ${dados.new_password} WHERE CODFUNC = ${dados.codfunc}`
-            );
-          });
-          res.send(200);
+          console.log(recordset);
+          let resposta = recordset.rowsAffected[0];
+
+          request.query(
+            `UPDATE FUNCIONARIO SET SENHA = ${dados.new_password} WHERE CODFUNC = ${dados.codfunc}`
+          );
+
+          res.json({ data: resposta });
         }
       );
     })
@@ -538,7 +541,7 @@ app.post("/campos", (req, res) => {
   console.log(req.body);
 
   let campo = req.body.campo;
-  let where = "WHERE TIPOID = 2";
+  let where = "WHERE TIPOID = 1";
 
   let campos = "";
 
