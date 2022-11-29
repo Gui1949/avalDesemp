@@ -7,6 +7,7 @@ const md5 = require("md5");
 const cors = require("cors");
 const { response } = require("express");
 const crypto = require("crypto");
+const { Console } = require("console");
 
 const connStr =
   "Server=10.10.10.5,1449;Database=AV_DESEMP;User Id=MEDSYSTEMS\\guilherme.floriano;Password=MickJa69@;trustServerCertificate=true";
@@ -157,6 +158,50 @@ app.post("/resposta", (req, res) => {
         INNER JOIN AVAPEN PEN ON PEN.CODAVA = ITE.CODAVA
         WHERE CODPEN = ${codpen} ORDER BY PIL.CODPIL`,
         function (err, recordset) {
+          res.json(recordset.recordsets[0]);
+        }
+      );
+    })
+    .catch((err) => console.log("erro! " + err));
+});
+
+app.post("/resposta_calibrar", (req, res) => {
+  console.log(req.body);
+
+  // let codpen = req.body.codpen;
+
+  sql
+    .connect(connStr)
+    .then((conn) => {
+      console.log("conectou!");
+
+      let request = new sql.Request();
+      request.query(
+        `SELECT CODPEN, FUN.NOMEFUNC, GES.NOMEFUNC AS NOMEGES, CODREF, NOMEPIL, PIL.TIPO, NOMECARA, RESPOSTA,
+
+        (SELECT RESPOSTA
+        FROM AVAITEM ITEM
+                INNER JOIN CARACTERISTICA CARA ON CARA.CODCARA  = ITEM.CODCARA
+                INNER JOIN PILAR PIL ON PIL.CODPIL = CARA.CODPIL
+                INNER JOIN AVAPEN PEN ON PEN.CODAVA = ITEM.CODAVA
+                INNER JOIN FUNCIONARIO FUN ON FUN.CODFUNC = PEN.CODFUNC
+                INNER JOIN FUNCIONARIO GES ON GES.CODFUNC = PEN.CODREF
+                WHERE STATUS = 1 AND PEN.CODFUNC = FUN.CODFUNC AND
+                CODREF IN(PEN.CODFUNC, FUN.CODGESTOR) AND PEN.
+                CODFUNC = 2 AND CODREF = FUN.CODGESTOR AND ITEM.CODCARA = ITE.CODCARA) AS RESPOSTA_GES
+        
+        FROM AVAITEM ITE
+                INNER JOIN CARACTERISTICA CARA ON CARA.CODCARA  = ITE.CODCARA
+                INNER JOIN PILAR PIL ON PIL.CODPIL = CARA.CODPIL
+                INNER JOIN AVAPEN PEN ON PEN.CODAVA = ITE.CODAVA
+                INNER JOIN FUNCIONARIO FUN ON FUN.CODFUNC = PEN.CODFUNC
+                INNER JOIN FUNCIONARIO GES ON GES.CODFUNC = FUN.CODGESTOR
+                WHERE STATUS = 1 AND PEN.CODFUNC = FUN.CODFUNC AND
+                CODREF IN(PEN.CODFUNC, FUN.CODGESTOR) AND PEN.
+                CODFUNC = 2 AND CODREF = 2
+                ORDER BY CARA.CODCARA`,
+        function (err, recordset) {
+          console.log(recordset.recordsets[0]);
           res.json(recordset.recordsets[0]);
         }
       );
@@ -399,12 +444,9 @@ app.post("/encerrar_aval", (req, res) => {
       console.log("conectou!");
 
       let request = new sql.Request();
-      request.query(
-        `UPDATE AVAPEN SET STATUS = 3 WHERE STATUS = 0`,
-        function (err, recordset) {
-          res.send(200);
-        }
-      );
+      request.query(`UPDATE AVAPEN SET STATUS = 3`, function (err, recordset) {
+        res.send(200);
+      });
     })
     .catch((err) => console.log("erro! " + err));
 });
@@ -469,6 +511,42 @@ app.post("/pendentes", (req, res) => {
       );
     })
     .catch((err) => console.log("erro! " + err));
+});
+
+app.post("/send_mail", (req, res) => {
+  console.log(req.body);
+
+  sql.connect(connStr).then((conn) => {
+    console.log("conectou!");
+
+    let request = new sql.Request();
+
+    request.query(
+      `SELECT CODREF, CODFUNC FROM AVAPEN WHERE STATUS = 0`,
+      function (err, recordset) {
+        let dados = recordset.recordsets[0];
+        dados.forEach((element) => {
+          request.query(
+            `SELECT EMAILFUNC, (SELECT NOMEFUNC FROM FUNCIONARIO WHERE CODFUNC = ${element.CODFUNC}) AS NOME FROM FUNCIONARIO WHERE CODFUNC = ${element.CODREF} AND TIPOID = 1`,
+            function (err, recordset) {
+              try {
+                let email = recordset.recordset[0].EMAILFUNC;
+                let nome = recordset.recordset[0].NOME;
+                console.log(email, nome);
+
+                let corpo = `Olá, a avaliação do liderado ${nome} ainda está PENDENTE. Entre no sistema de Avaliações de Desempenho para realizar a mesma.`
+
+                //Inserir aqui o nodemailer
+
+              } catch {
+                console.log("Erro!");
+              }
+            }
+          );
+        });
+      }
+    );
+  });
 });
 
 app.post("/send_formulario", (req, res) => {
