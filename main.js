@@ -93,6 +93,36 @@ app.post("/login", (req, res) => {
     .catch((err) => console.log("erro! " + err));
 });
 
+
+app.post("/login_sso", (req, res) => {
+  console.log(req.body);
+
+  let email = req.body.email;
+
+  sql
+    .connect(connStr)
+    .then((conn) => {
+      console.log("conectou!");
+
+      let request = new sql.Request();
+      request.query(
+        `SELECT CODFUNC, TIPOID, CODGESTOR FROM FUNCIONARIO WHERE EMAILFUNC = '${email}'`,
+        function (err, recordset) {
+          try {
+            console.log(recordset.recordsets[0][0]);
+            let resposta = recordset.recordsets[0][0];
+            resposta.token = sessao();
+            criar_sessao(resposta.CODFUNC, resposta.token);
+            res.json(resposta);
+          } catch {
+            res.send(403);
+          }
+        }
+      );
+    })
+    .catch((err) => console.log("erro! " + err));
+});
+
 app.post("/valida", (req, res) => {
   console.log(req.body);
 
@@ -238,6 +268,52 @@ app.post("/resposta_calibrar", (req, res) => {
                 CODREF IN(PEN.CODFUNC, FUN.CODGESTOR) AND PEN.
                 CODFUNC = ${codfunc} AND CODREF = ${codfunc}
                 ORDER BY CARA.CODCARA`,
+        function (err, recordset) {
+          console.log(recordset.recordsets[0]);
+          res.json(recordset.recordsets[0]);
+        }
+      );
+    })
+    .catch((err) => console.log("erro! " + err));
+});
+
+app.post("/resposta_func", (req, res) => {
+  console.log(req.body);
+
+  let codfunc = req.body.codfunc;
+
+  sql
+    .connect(connStr)
+    .then((conn) => {
+      console.log("conectou!");
+
+      let request = new sql.Request();
+      request.query(
+        `SELECT CODPEN, FUN.NOMEFUNC, GES.NOMEFUNC AS NOMEGES, CODREF, NOMEPIL, PIL.TIPO, NOMECARA, RESPOSTA AS RESPOSTA_GES,
+
+        (SELECT RESPOSTA
+        FROM AVAITEM ITEM
+                INNER JOIN CARACTERISTICA CARA ON CARA.CODCARA  = ITEM.CODCARA
+                INNER JOIN PILAR PIL ON PIL.CODPIL = CARA.CODPIL
+                INNER JOIN AVAPEN PEN ON PEN.CODAVA = ITEM.CODAVA
+                INNER JOIN FUNCIONARIO FUN ON FUN.CODFUNC = PEN.CODFUNC
+                INNER JOIN FUNCIONARIO GES ON GES.CODFUNC = PEN.CODREF
+                WHERE STATUS = 3 AND PEN.CODFUNC = FUN.CODFUNC AND
+                CODREF IN(PEN.CODFUNC, FUN.CODGESTOR) AND PEN.
+                CODFUNC = ${codfunc} AND CODREF = ${codfunc} AND ITEM.CODCARA = ITE.CODCARA) AS RESPOSTA
+        
+        FROM AVAITEM ITE
+                INNER JOIN CARACTERISTICA CARA ON CARA.CODCARA  = ITE.CODCARA
+                INNER JOIN PILAR PIL ON PIL.CODPIL = CARA.CODPIL
+                INNER JOIN AVAPEN PEN ON PEN.CODAVA = ITE.CODAVA
+                INNER JOIN FUNCIONARIO FUN ON FUN.CODFUNC = PEN.CODFUNC
+                INNER JOIN FUNCIONARIO GES ON GES.CODFUNC = FUN.CODGESTOR
+                WHERE STATUS = 3 AND PEN.CODFUNC = FUN.CODFUNC AND
+                CODREF IN(PEN.CODFUNC, FUN.CODGESTOR) AND PEN.
+                CODFUNC = ${codfunc} AND CODREF = FUN.CODGESTOR
+                ORDER BY CARA.CODCARA
+
+	`,
         function (err, recordset) {
           console.log(recordset.recordsets[0]);
           res.json(recordset.recordsets[0]);
