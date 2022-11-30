@@ -8,6 +8,7 @@ const cors = require("cors");
 const { response } = require("express");
 const crypto = require("crypto");
 const { Console } = require("console");
+const nodemailer = require("nodemailer");
 
 const connStr =
   "Server=10.10.10.5,1449;Database=AV_DESEMP;User Id=MEDSYSTEMS\\guilherme.floriano;Password=MickJa69@;trustServerCertificate=true";
@@ -15,6 +16,16 @@ const connStr =
 app.use(bodyParser.urlencoded({ extended: false }));
 app.use(bodyParser.json());
 app.use(cors());
+
+let transporter = nodemailer.createTransport({
+  host: "smtp.office365.com",
+  port: 587,
+  secure: false,
+  auth: {
+    user: "noreply@medsystems.com.br",
+    pass: "3fafd51@!#W@1fd2838e0ade8e816454615da",
+  },
+});
 
 let sessao = () => {
   let token = crypto.randomBytes(64).toString("hex");
@@ -140,6 +151,33 @@ app.post("/formulario", (req, res) => {
     .catch((err) => console.log("erro! " + err));
 });
 
+app.post("/edit_formulario", (req, res) => {
+  console.log(req.body);
+
+  let codpen = req.body.codpen;
+
+  sql
+    .connect(connStr)
+    .then((conn) => {
+      console.log("conectou!");
+
+      let request = new sql.Request();
+      request.query(
+        `SELECT PIL.CODPIL, NOMEPIL, CARA.CODCARA, NOMECARA, PIL.TIPO,
+        (SELECT RESPOSTA FROM AVAITEM 
+        INNER JOIN AVAPEN PEN ON PEN.CODAVA = AVAITEM.CODAVA
+        WHERE AVAITEM.CODCARA = CARA.CODCARA AND PEN.CODPEN = ${codpen}) AS RESPOSTA
+        FROM CARACTERISTICA CARA
+                INNER JOIN PILAR PIL ON PIL.CODPIL = CARA.CODPIL
+            ORDER BY CARA.CODCARA`,
+        function (err, recordset) {
+          res.json(recordset.recordsets[0]);
+        }
+      );
+    })
+    .catch((err) => console.log("erro! " + err));
+});
+
 app.post("/resposta", (req, res) => {
   console.log(req.body);
 
@@ -168,7 +206,7 @@ app.post("/resposta", (req, res) => {
 app.post("/resposta_calibrar", (req, res) => {
   console.log(req.body);
 
-  // let codpen = req.body.codpen;
+  let codfunc = req.body.codfunc;
 
   sql
     .connect(connStr)
@@ -186,9 +224,9 @@ app.post("/resposta_calibrar", (req, res) => {
                 INNER JOIN AVAPEN PEN ON PEN.CODAVA = ITEM.CODAVA
                 INNER JOIN FUNCIONARIO FUN ON FUN.CODFUNC = PEN.CODFUNC
                 INNER JOIN FUNCIONARIO GES ON GES.CODFUNC = PEN.CODREF
-                WHERE STATUS = 1 AND PEN.CODFUNC = FUN.CODFUNC AND
+                WHERE STATUS = 2 AND PEN.CODFUNC = FUN.CODFUNC AND
                 CODREF IN(PEN.CODFUNC, FUN.CODGESTOR) AND PEN.
-                CODFUNC = 2 AND CODREF = FUN.CODGESTOR AND ITEM.CODCARA = ITE.CODCARA) AS RESPOSTA_GES
+                CODFUNC = ${codfunc} AND CODREF = FUN.CODGESTOR AND ITEM.CODCARA = ITE.CODCARA) AS RESPOSTA_GES
         
         FROM AVAITEM ITE
                 INNER JOIN CARACTERISTICA CARA ON CARA.CODCARA  = ITE.CODCARA
@@ -196,9 +234,9 @@ app.post("/resposta_calibrar", (req, res) => {
                 INNER JOIN AVAPEN PEN ON PEN.CODAVA = ITE.CODAVA
                 INNER JOIN FUNCIONARIO FUN ON FUN.CODFUNC = PEN.CODFUNC
                 INNER JOIN FUNCIONARIO GES ON GES.CODFUNC = FUN.CODGESTOR
-                WHERE STATUS = 1 AND PEN.CODFUNC = FUN.CODFUNC AND
+                WHERE STATUS = 2 AND PEN.CODFUNC = FUN.CODFUNC AND
                 CODREF IN(PEN.CODFUNC, FUN.CODGESTOR) AND PEN.
-                CODFUNC = 2 AND CODREF = 2
+                CODFUNC = ${codfunc} AND CODREF = ${codfunc}
                 ORDER BY CARA.CODCARA`,
         function (err, recordset) {
           console.log(recordset.recordsets[0]);
@@ -522,22 +560,26 @@ app.post("/send_mail", (req, res) => {
     let request = new sql.Request();
 
     request.query(
-      `SELECT CODREF, CODFUNC FROM AVAPEN WHERE STATUS = 0`,
+      `SELECT CODREF, CODFUNC FROM AVAPEN WHERE STATUS = 0 AND CODFUNC = 2 AND CODFUNC <> CODREF`,
       function (err, recordset) {
         let dados = recordset.recordsets[0];
         dados.forEach((element) => {
           request.query(
-            `SELECT EMAILFUNC, (SELECT NOMEFUNC FROM FUNCIONARIO WHERE CODFUNC = ${element.CODFUNC}) AS NOME FROM FUNCIONARIO WHERE CODFUNC = ${element.CODREF} AND TIPOID = 1`,
+            `SELECT EMAILFUNC, (SELECT NOMEFUNC FROM FUNCIONARIO WHERE CODFUNC = ${element.CODFUNC}) AS NOME FROM FUNCIONARIO WHERE CODFUNC = ${element.CODREF} AND TIPOID = 1 `,
             function (err, recordset) {
               try {
                 let email = recordset.recordset[0].EMAILFUNC;
                 let nome = recordset.recordset[0].NOME;
                 console.log(email, nome);
 
-                let corpo = `Olá, a avaliação do liderado ${nome} ainda está PENDENTE. Entre no sistema de Avaliações de Desempenho para realizar a mesma.`
+                let corpo = `Olá, a avaliação do liderado ${nome} ainda está PENDENTE. Entre no sistema de Avaliações de Desempenho para realizar a mesma.`;
 
-                //Inserir aqui o nodemailer
-
+                transporter.sendMail({
+                  from: '"Avaliação de Desempenho - JL Health" <noreply@medsystems.com.br>',
+                  to: email,
+                  subject: "Avaliação de Desempenho Pendente",
+                  html: corpo,
+                });
               } catch {
                 console.log("Erro!");
               }
@@ -613,6 +655,39 @@ app.post("/send_formulario", (req, res) => {
       );
     })
     .catch((err) => console.log("erro! " + err));
+});
+
+app.post("/update_formulario", (req, res) => {
+  console.log(req.body);
+
+  let corpo = req.body.dados;
+  let codpen = req.body.codpen;
+
+  //update
+
+  for (const [key, value] of Object.entries(corpo)) {
+    console.log(`${key}: ${value}`);
+
+    sql
+      .connect(connStr)
+      .then((conn) => {
+        console.log("conectou!");
+
+        let request = new sql.Request();
+
+        request.query(
+          `
+          UPDATE ITEM SET RESPOSTA = '${value}' FROM AVAITEM AS ITEM
+          INNER JOIN AVAPEN PEN ON PEN.CODAVA = ITEM.CODAVA
+          WHERE PEN.CODPEN = ${codpen} AND ITEM.CODCARA = ${key}
+                          `,
+          function (err, recordset) {
+            console.log(recordset, err);
+          }
+        );
+      })
+      .catch((err) => console.log("erro! " + err));
+  }
 });
 
 app.post("/campos", (req, res) => {
