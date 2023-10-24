@@ -11,7 +11,7 @@ const { Console } = require("console");
 const nodemailer = require("nodemailer");
 
 const connStr =
-  "Server=10.10.10.5,1449;Database=AV_DESEMP;User Id=MEDSYSTEMS\\guilherme.floriano;Password=MickJa69@;trustServerCertificate=true";
+  "Server=0.0.0.0,1449;Database=AV_DESEMP;User Id=admin;Password=123456;trustServerCertificate=true";
 
 app.use(bodyParser.urlencoded({ extended: false }));
 app.use(bodyParser.json());
@@ -22,8 +22,8 @@ let transporter = nodemailer.createTransport({
   port: 587,
   secure: false,
   auth: {
-    user: "noreply@medsystems.com.br",
-    pass: "3fafd51@!#W@1fd2838e0ade8e816454615da",
+    user: "xxxx@xxxxxxx.com.br",
+    pass: "123456",
   },
 });
 
